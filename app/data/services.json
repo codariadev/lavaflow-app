@@ -1,0 +1,56 @@
+[
+  {
+    "id": "carro_simples",
+    "name": "Lavagem Simples (Carro)",
+    "price": 30,
+    "category": "veiculo"
+  },
+  {
+    "id": "carro_completa",
+    "name": "Lavagem Completa (Carro)",
+    "price": 50,
+    "category": "veiculo"
+  },
+  {
+    "id": "moto",
+    "name": "Lavagem de Moto",
+    "price": 25,
+    "category": "veiculo"
+  },
+  {
+    "id": "quadriciclo",
+    "name": "Lavagem Quadriciclos e Máquinas pequenas",
+    "price": 40,
+    "category": "veiculo"
+  },
+  {
+    "id": "higienizacao_auto",
+    "name": "Higienização Automotiva",
+    "price": 150,
+    "category": "veiculo"
+  },
+  {
+    "id": "motor",
+    "name": "Limpeza Técnica Motor",
+    "price": 100,
+    "category": "veiculo"
+  },
+  {
+    "id": "farois",
+    "name": "Cristalização de Faróis",
+    "price": 80,
+    "category": "veiculo"
+  },
+  {
+    "id": "tapetes",
+    "name": "Lavagem Tapetes (Residencial)",
+    "price": 30,
+    "category": "residencial"
+  },
+  {
+    "id": "higienizacao_colchao",
+    "name": "Higienização Colchões",
+    "price": 0,
+    "category": "residencial"
+  }
+]
