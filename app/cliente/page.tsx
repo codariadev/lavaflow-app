@@ -14,6 +14,7 @@ import {
 } from 'firebase/firestore';
 import { auth, db } from '../lib/firebase';
 import defaultServices from '../data/services.json';
+import ProtectedRoute from '../components/ProtectedRoute';
 
 interface Agendamento {
   id: string;
@@ -210,6 +211,8 @@ export default function ClienteHome() {
   }
 
   return (
+    <ProtectedRoute allowedRole='cliente'>
+
     <div className="min-h-screen bg-slate-50 p-4 sm:p-6 lg:p-8">
       <div className="max-w-xl mx-auto space-y-6">
         
@@ -372,5 +375,6 @@ export default function ClienteHome() {
 
       </div>
     </div>
-  );
+    </ProtectedRoute>
+);
 }
