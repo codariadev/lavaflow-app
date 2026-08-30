@@ -18,23 +18,36 @@ export default function Login() {
   const [error, setError] = useState("");
 
   const handleRedirectByRole = async (uid: string) => {
-    const userDoc = await getDoc(doc(db, "users", uid));
+    try {
+      const userRef = doc(db, "users", uid);
+      const userDoc = await getDoc(userRef);
 
-    if (userDoc.exists()) {
-      const role = userDoc.data().role;
-      if (role === "adm") router.push("/adm");
-      else if (role === "lavador") router.push("/lavador");
-      else router.push("/cliente");
-    } else {
-      await setDoc(doc(db, "users", uid), {
-        role: "cliente",
-        createdAt: new Date().toISOString(),
-      });
-      router.push("/cliente");
+      if (userDoc.exists()) {
+        const role = userDoc.data()?.role;
+        if (role === "adm") router.push("/adm");
+        else if (role === "lavador") router.push("/lavador");
+        else router.push("/cliente");
+        return true;
+      } else {
+        // Cria o documento inicial usando setDoc com { merge: true } para evitar erro de gravação
+        await setDoc(
+          userRef,
+          {
+            role: "cliente",
+            createdAt: new Date().toISOString(),
+          },
+          { merge: true }
+        );
+        router.push("/cliente");
+        return true;
+      }
+    } catch (err) {
+      console.error("Erro ao verificar/criar usuário:", err);
+      return false;
     }
   };
 
- const handleEmailLogin = async (e: React.FormEvent) => {
+  const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError("");
@@ -71,7 +84,12 @@ export default function Login() {
         <div className="w-full flex flex-col justify-center items-center">
           
           <div className="p-6 mb-0 text-center bg-white border-b-0 rounded-t-2xl text-slate-700 text-2xl sm:text-sm">
-            <h5 className="font-bold">Entrar no LavaFlow <p className="text-[12px] text-right">powered by <a className="underline" href="https://codariadev.vercel.app/">CodariaDev</a></p> </h5>
+            <h5 className="font-bold">
+              Entrar no LavaFlow 
+              <span className="block text-[12px] text-right font-normal">
+                powered by <a className="underline" href="https://codariadev.vercel.app/">CodariaDev</a>
+              </span>
+            </h5>
           </div>
 
           {error && (
@@ -90,7 +108,6 @@ export default function Login() {
               >
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
-                  version="1.1"
                   viewBox="0 0 64 64"
                   height="32px"
                   width="24px"
@@ -144,29 +161,6 @@ export default function Login() {
                   onChange={(e) => setPassword(e.target.value)}
                   className="sm:text-sm text-base focus:shadow-soft-primary-outline leading-5.6 ease-soft block w-full appearance-none rounded-lg border border-solid border-gray-300 bg-white bg-clip-padding py-2 px-3 font-normal text-gray-700 transition-all focus:border-slate-800 focus:bg-white focus:outline-none"
                 />
-              </div>
-
-              <div className="flex items-center justify-between min-h-6 mb-0.5">
-                <div className="pl-7">
-                  <input
-                    type="checkbox"
-                    id="remember"
-                    className="w-5 h-5 ease-soft -ml-7 rounded-1.4 checked:bg-linear-to-tl checked:from-gray-900 checked:to-slate-800 relative float-left mt-1 cursor-pointer appearance-none border border-solid border-slate-200 bg-white"
-                  />
-                  <label
-                    htmlFor="remember"
-                    className="ml-1 font-normal cursor-pointer select-none text-sm text-slate-700"
-                  >
-                    Lembrar de mim
-                  </label>
-                </div>
-
-                <a
-                  href="#"
-                  className="font-bold text-sm text-slate-700 hover:opacity-75"
-                >
-                  Esqueci minha senha
-                </a>
               </div>
 
               <div className="text-center">

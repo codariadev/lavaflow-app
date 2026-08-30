@@ -6,6 +6,7 @@ import {
   GoogleAuthProvider 
 } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
+import { getMessaging, isSupported, Messaging } from "firebase/messaging";
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -27,5 +28,15 @@ if (typeof window !== "undefined") {
     console.error("Erro ao configurar persistencia do Firebase Auth:", err);
   });
 }
+
+export const getMessagingInstance = async (): Promise<Messaging | null> => {
+  if (typeof window !== "undefined") {
+    const supported = await isSupported();
+    if (supported) {
+      return getMessaging(app);
+    }
+  }
+  return null;
+};
 
 export { app };
