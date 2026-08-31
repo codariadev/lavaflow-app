@@ -8,7 +8,7 @@ import { auth, db } from '../lib/firebase';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
-  allowedRole?: 'adm' | 'lavador' | 'cliente';
+  allowedRole?: 'adm' | 'lavador' | 'cliente' | 'dev';
 }
 
 export default function ProtectedRoute({ children, allowedRole }: ProtectedRouteProps) {
@@ -26,7 +26,6 @@ export default function ProtectedRoute({ children, allowedRole }: ProtectedRoute
       const userDocRef = doc(db, 'users', user.uid);
       const unsubscribeDoc = onSnapshot(userDocRef, async (docSnap) => {
         if (!docSnap.exists()) {
-          // Se o documento não existir, garante que ele seja criado antes de barrar a rota
           await setDoc(userDocRef, { role: 'cliente', createdAt: new Date().toISOString() }, { merge: true });
           setAuthorized(true);
           setLoading(false);
@@ -39,6 +38,7 @@ export default function ProtectedRoute({ children, allowedRole }: ProtectedRoute
         if (allowedRole && role !== allowedRole) {
           if (role === 'adm') router.push('/adm');
           else if (role === 'lavador') router.push('/lavador');
+          else if (role === 'dev') router.push('/master');
           else router.push('/cliente');
         } else {
           setAuthorized(true);

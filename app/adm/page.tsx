@@ -23,6 +23,7 @@ interface Agendamento {
   vehicleModel?: string;
   licensePlate?: string;
   serviceType?: string;
+  serviceName?: string;
   date?: string;
   time?: string;
   status: "pendente" | "andamento" | "concluido" | "cancelado";
@@ -55,6 +56,7 @@ export default function AdmDashboard() {
   const [loading, setLoading] = useState(true);
   const [agendamentos, setAgendamentos] = useState<Agendamento[]>([]);
   const [servicos, setServicos] = useState<Servico[]>([]);
+  const [mostrarPrecos, setMostrarPrecos] = useState<boolean>(true);
   const [funcionarios, setFuncionarios] = useState<Funcionario[]>([]);
   const [userName, setUserName] = useState<string>("Administrador");
 
@@ -121,11 +123,22 @@ export default function AdmDashboard() {
             "servicos"
           );
           unsubServicos = onSnapshot(servicosRef, (docSnap) => {
-            if (docSnap.exists() && Array.isArray(docSnap.data().lista)) {
-              setServicos(docSnap.data().lista);
+            if (docSnap.exists()) {
+              const data = docSnap.data();
+              if (Array.isArray(data.lista)) {
+                setServicos(data.lista);
+              } else {
+                setServicos([]);
+              }
+              if (typeof data.mostrarPrecos === "boolean") {
+                setMostrarPrecos(data.mostrarPrecos);
+              } else {
+                setMostrarPrecos(true);
+              }
             } else {
               setServicos([]);
-              setDoc(servicosRef, { lista: [] });
+              setMostrarPrecos(true);
+              setDoc(servicosRef, { lista: [], mostrarPrecos: true });
             }
           });
 
@@ -206,7 +219,7 @@ export default function AdmDashboard() {
 
       await setDoc(
         doc(db, "empresas", empresaId, "configuracoes", "servicos"),
-        { lista: [] },
+        { lista: [], mostrarPrecos: true },
         { merge: true }
       );
 
@@ -223,20 +236,29 @@ export default function AdmDashboard() {
     }
   };
 
+  const getValorServico = (item: Agendamento) => {
+    const servicoPorId = servicos.find((s) => s.id === item.serviceType);
+    if (servicoPorId) return servicoPorId.price;
+
+    const termoBusca = (item.serviceName || item.serviceType || "").trim().toLowerCase();
+    const servicoPorNome = servicos.find(
+      (s) => s.name.trim().toLowerCase() === termoBusca
+    );
+    if (servicoPorNome) return servicoPorNome.price;
+
+    return 0;
+  };
+
   const getValorTotalAgendamento = (item: Agendamento) => {
-    const precoBase = getValorServico(item.serviceType);
+    const precoBase = getValorServico(item);
     const extra = item.valorAdicional || 0;
     return precoBase + extra;
   };
 
-  const getValorServico = (type?: string) => {
-    const servico = servicos.find((s) => s.id === type);
-    return servico ? servico.price : 0;
-  };
-
-  const getServiceLabel = (type?: string) => {
-    const servico = servicos.find((s) => s.id === type);
-    return servico ? servico.name : "Serviço Selecionado";
+  const getServiceLabel = (item: Agendamento) => {
+    if (item.serviceName) return item.serviceName;
+    const servico = servicos.find((s) => s.id === item.serviceType);
+    return servico ? servico.name : (item.serviceType || "Serviço Selecionado");
   };
 
   const handlePriceChange = (id: string, newPrice: number) => {
@@ -273,7 +295,9 @@ export default function AdmDashboard() {
         doc(db, "empresas", empresaId, "configuracoes", "servicos"),
         {
           lista: servicos,
-        }
+          mostrarPrecos: mostrarPrecos,
+        },
+        { merge: true }
       );
       alert("Serviços atualizados com sucesso!");
       setModalPrecosAberto(false);
@@ -594,7 +618,7 @@ export default function AdmDashboard() {
                         </div>
                       </td>
                       <td className="p-4 font-medium">
-                        <div>{getServiceLabel(item.serviceType)}</div>
+                        <div>{getServiceLabel(item)}</div>
                         {item.obs && (
                           <div className="text-xs text-blue-600 font-semibold mt-0.5">
                             + {item.obs}
@@ -863,6 +887,23 @@ export default function AdmDashboard() {
                   </button>
                 </div>
 
+                <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between">
+                  <div>
+                    <span className="block text-xs font-bold text-slate-800">
+                      Visualizar preços para os clientes
+                    </span>
+                    <span className="block text-[11px] text-slate-500">
+                      Se desmarcado, os preços dos serviços ficarão ocultos na tela do cliente.
+                    </span>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={mostrarPrecos}
+                    onChange={(e) => setMostrarPrecos(e.target.checked)}
+                    className="w-4 h-4 accent-blue-600 cursor-pointer"
+                  />
+                </div>
+
                 <form
                   onSubmit={handleAdicionarServico}
                   className="p-3 bg-blue-50/60 border border-blue-100 rounded-xl space-y-2"
@@ -933,7 +974,7 @@ export default function AdmDashboard() {
                           onChange={(e) =>
                             handlePriceChange(
                               servico.id,
-                              parseFloat(e.target.value) || 0,
+                              parseFloat(e.target.value) || 0
                             )
                           }
                           className="w-full text-sm font-bold p-2 rounded-lg border border-slate-200 bg-white focus:outline-none focus:border-blue-500 text-slate-800"

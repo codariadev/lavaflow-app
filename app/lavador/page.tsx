@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { signOut, onAuthStateChanged } from "firebase/auth";
+import { onAuthStateChanged } from "firebase/auth";
 import {
   collection,
   onSnapshot,
@@ -13,6 +13,7 @@ import {
 } from "firebase/firestore";
 import { auth, db } from "../lib/firebase";
 import ProtectedRoute from "../components/ProtectedRoute";
+import Footer from "../components/Footer";
 
 interface Agendamento {
   id: string;
@@ -52,9 +53,9 @@ const HORARIOS_DISPONIVEIS = Array.from({ length: 25 }, (_, i) => {
 
 export default function LavadorHome() {
   const router = useRouter();
-  const [filtro, setFiltro] = useState<"pendente" | "andamento" | "concluido">(
-    "pendente",
-  );
+  const [filtro, setFiltro] = useState<
+    "pendente" | "andamento" | "concluido" | "cancelado"
+  >("pendente");
   const [modalManual, setModalManual] = useState(false);
   const [modalConcluir, setModalConcluir] = useState<Agendamento | null>(null);
   const [modalAprovar, setModalAprovar] = useState<Agendamento | null>(null);
@@ -184,14 +185,6 @@ export default function LavadorHome() {
     };
   }, [router]);
 
-  const handleLogout = async () => {
-    try {
-      await signOut(auth);
-      router.push("/login");
-    } catch (error) {
-      console.error(error);
-    }
-  };
 
   const handleAprovarAgendamento = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -228,7 +221,7 @@ export default function LavadorHome() {
 
   const alterarStatus = async (
     id: string,
-    novoStatus: "andamento" | "concluido",
+    novoStatus: "andamento" | "concluido" | "cancelado",
     obsExtra?: string,
     valorAdicional?: number,
   ) => {
@@ -277,7 +270,6 @@ export default function LavadorHome() {
       adicionaisSelecionados.includes(s.id),
     );
 
-    // Calcula o valor total apenas dos adicionais
     const valorAdicionalTotal = servicosExtrasObj.reduce(
       (acc, s) => acc + (s.price || 0),
       0,
@@ -370,7 +362,7 @@ export default function LavadorHome() {
       mensagem = `Olá ${clienteNome}, tudo bem? Seu serviço (${veiculo}) foi concluído com sucesso! Seu veículo/item está pronto para retirada. ✨🚗`;
     } else {
       const horarioTexto = data && hora ? ` para o dia ${data} às ${hora}` : "";
-      mensagem = `Olá ${clienteNome}, tudo bem? Seu agendamento para o serviço (${veiculo}) foi confirmed${horarioTexto} com duração de 1 hora aproximadamente.`;
+      mensagem = `Olá ${clienteNome}, tudo bem? Seu agendamento para o serviço (${veiculo}) foi confirmado${horarioTexto}.`;
     }
 
     const texto = encodeURIComponent(mensagem);
@@ -417,13 +409,6 @@ export default function LavadorHome() {
                   {userName}
                 </span>
               </div>
-
-              <button
-                onClick={handleLogout}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition cursor-pointer"
-              >
-                Sair
-              </button>
             </div>
           </header>
 
@@ -446,7 +431,7 @@ export default function LavadorHome() {
             Incluir Agendamento Manual (Presencial)
           </button>
 
-          <div className="flex bg-slate-200 p-1 rounded-xl text-xs font-bold">
+          <div className="flex bg-slate-200 p-1 rounded-xl text-xs font-bold gap-1">
             <button
               onClick={() => setFiltro("pendente")}
               className={`flex-1 py-2 rounded-lg transition cursor-pointer ${
@@ -476,6 +461,16 @@ export default function LavadorHome() {
               }`}
             >
               Concluídos
+            </button>
+            <button
+              onClick={() => setFiltro("cancelado")}
+              className={`flex-1 py-2 rounded-lg transition cursor-pointer ${
+                filtro === "cancelado"
+                  ? "bg-white text-slate-900 shadow-sm"
+                  : "text-slate-600"
+              }`}
+            >
+              Cancelados
             </button>
           </div>
 
@@ -527,7 +522,7 @@ export default function LavadorHome() {
                     </div>
                   )}
 
-                  <div className="pt-2 border-t border-slate-100 flex gap-2 mt-3">
+                  <div className="pt-2 border-t border-slate-100 flex flex-wrap gap-2 mt-3 items-center">
                     {item.telefone ? (
                       <a
                         href={getWhatsappUrl(
@@ -586,6 +581,24 @@ export default function LavadorHome() {
                         Finalizar Lavação
                       </button>
                     )}
+
+                    {item.status !== "concluido" &&
+                      item.status !== "cancelado" && (
+                        <button
+                          onClick={() => {
+                            if (
+                              confirm(
+                                "Deseja realmente cancelar este agendamento?",
+                              )
+                            ) {
+                              alterarStatus(item.id, "cancelado");
+                            }
+                          }}
+                          className="py-2 px-3 bg-red-50 hover:bg-red-100 text-red-600 font-bold rounded-lg text-xs transition cursor-pointer border border-red-200"
+                        >
+                          Cancelar
+                        </button>
+                      )}
                   </div>
                 </div>
               );
@@ -717,8 +730,9 @@ export default function LavadorHome() {
                         );
                       })}
 
-                    {servicos.filter((s) => s.id !== modalConcluir.serviceType)
-                      .length === 0 && (
+                    {servicos.filter(
+                      (s) => s.id !== modalConcluir.serviceType,
+                    ).length === 0 && (
                       <p className="text-center text-slate-400 text-xs py-3">
                         Nenhum outro serviço cadastrado para esta empresa.
                       </p>
@@ -852,6 +866,7 @@ export default function LavadorHome() {
             </div>
           )}
         </div>
+        <Footer/>
       </div>
     </ProtectedRoute>
   );

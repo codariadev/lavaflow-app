@@ -29,7 +29,6 @@ export default function Login() {
         else router.push("/cliente");
         return true;
       } else {
-        // Cria o documento inicial usando setDoc com { merge: true } para evitar erro de gravação
         await setDoc(
           userRef,
           {
@@ -174,7 +173,7 @@ export default function Login() {
               </div>
 
               <p className="mt-4 mb-0 leading-normal text-sm text-slate-700 text-center">
-                Ainda não tem uma conta?{" "}
+                É empresa <br/> ou <br/> ainda não tem uma conta?<br/>
                 <Link
                   className="font-bold text-slate-700 underline"
                   href="/register"

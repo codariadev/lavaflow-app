@@ -21,22 +21,18 @@ export default function RegisterPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  // Controle de Etapas: 1 = Autenticação, 2 = Seleção de Perfil
   const [step, setStep] = useState<1 | 2>(1);
   const [userCreated, setUserCreated] = useState<User | null>(null);
 
-  // Form Passo 1
   const [nome, setNome] = useState('');
   const [email, setEmail] = useState('');
   const [senha, setSenha] = useState('');
 
-  // Form Passo 2
   const [tipoConta, setTipoConta] = useState<'cliente' | 'empresa'>('cliente');
 
   const [erro, setErro] = useState('');
   const [loading, setLoading] = useState(false);
 
-  // Detecta redirecionamento vindo da tela de login (?step=2)
   useEffect(() => {
     const stepParam = searchParams.get('step');
 
@@ -52,7 +48,6 @@ export default function RegisterPage() {
     return () => unsubscribe();
   }, [searchParams]);
 
-  // ETAPA 1: Autenticação via E-mail/Senha
   const handleAuthRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setErro('');
@@ -78,7 +73,6 @@ export default function RegisterPage() {
     }
   };
 
-  // ETAPA 1 (Alternativa): Autenticação via Google
   const handleGoogleRegister = async () => {
     setErro('');
     setLoading(true);
@@ -100,7 +94,6 @@ export default function RegisterPage() {
     }
   };
 
-  // ETAPA 2: Salva perfil (Cliente ou Empresa) e redireciona
   const handleProfileSelection = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!userCreated) return;
@@ -111,7 +104,6 @@ export default function RegisterPage() {
     try {
       const role = tipoConta === 'empresa' ? 'adm' : 'cliente';
 
-      // Salva os dados básicos do usuário no Firestore
       await setDoc(
         doc(db, 'users', userCreated.uid),
         {
@@ -124,7 +116,6 @@ export default function RegisterPage() {
         { merge: true }
       );
 
-      // Se for empresa, redireciona diretamente para a área ADM, onde o modal cuidará do cadastro da empresa
       if (tipoConta === 'empresa') {
         router.push('/adm');
       } else {
@@ -158,7 +149,6 @@ export default function RegisterPage() {
           </div>
         )}
 
-        {/* ETAPA 1 */}
         {step === 1 && (
           <div className="space-y-4">
             <button
@@ -243,7 +233,6 @@ export default function RegisterPage() {
           </div>
         )}
 
-        {/* ETAPA 2 */}
         {step === 2 && (
           <form onSubmit={handleProfileSelection} className="space-y-4">
             <div className="flex bg-slate-100 p-1 rounded-xl text-xs font-bold">
