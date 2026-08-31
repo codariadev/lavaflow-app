@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 import { signOut, onAuthStateChanged, User } from 'firebase/auth';
 import { 
   collection, 
-  collectionGroup,
   addDoc, 
   query, 
   where, 
@@ -95,39 +94,6 @@ export default function ClienteHome() {
   };
 
   useEffect(() => {
-    const carregarEmpresas = async () => {
-      try {
-        const querySnapshot = await getDocs(collection(db, 'empresas'));
-        const lista: Empresa[] = querySnapshot.docs.map((docSnap) => ({
-          id: docSnap.id,
-          nome: docSnap.data().nome || 'Lava-Jato',
-          endereco: docSnap.data().endereco || '',
-        }));
-        setEmpresas(lista);
-      } catch (err) {
-        console.error("Erro ao carregar lista de empresas:", err);
-      }
-    };
-
-    carregarEmpresas();
-  }, []);
-
-  useEffect(() => {
-    if (!empresaSelecionada) return;
-
-    const servicosRef = doc(db, 'empresas', empresaSelecionada.id, 'configuracoes', 'servicos');
-    const unsubServicos = onSnapshot(servicosRef, (docSnap) => {
-      if (docSnap.exists() && docSnap.data().lista) {
-        setServicos(docSnap.data().lista);
-      } else {
-        setServicos(defaultServices as Servico[]);
-      }
-    });
-
-    return () => unsubServicos();
-  }, [empresaSelecionada]);
-
-  useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, async (currentUser) => {
       if (!currentUser) {
         router.push('/login');
@@ -146,45 +112,96 @@ export default function ClienteHome() {
       } catch (err) {
         console.error("Erro ao buscar dados do usuário:", err);
       }
-
-      // Busca em TODAS as subcoleções 'agendamentos' das empresas usando collectionGroup
-      const q = query(
-        collectionGroup(db, 'agendamentos'),
-        where('clienteId', '==', currentUser.uid)
-      );
-
-      const unsubscribeSnapshot = onSnapshot(q, (snapshot) => {
-        const lista = snapshot.docs.map((docSnap) => ({
-          ...docSnap.data(),
-          id: docSnap.id,
-        })) as Agendamento[];
-
-        lista.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-
-        const ativo = lista.find(
-          (item) => item.status === 'aguardando_aprovacao' || item.status === 'pendente' || item.status === 'andamento'
-        );
-
-        const ultimoConcluido = lista.find((item) => item.status === 'concluido');
-        if (ultimoConcluido) {
-          const key = `notificado_${ultimoConcluido.id}`;
-          if (!localStorage.getItem(key)) {
-            dispararNotificacaoPushCliente(ultimoConcluido.vehicleModel, ultimoConcluido.licensePlate);
-            localStorage.setItem(key, 'true');
-          }
-        }
-
-        setAgendamentoAtivo(ativo || null);
-        setLoading(false);
-      });
-
-      return () => unsubscribeSnapshot();
     });
 
-    return () => {
-      unsubscribeAuth();
-    };
+    return () => unsubscribeAuth();
   }, [router]);
+
+  useEffect(() => {
+    if (!user) return;
+
+    const carregarEmpresasEAgendamentos = async () => {
+      try {
+        const querySnapshot = await getDocs(collection(db, 'empresas'));
+        const listaEmpresas: Empresa[] = querySnapshot.docs.map((docSnap) => ({
+          id: docSnap.id,
+          nome: docSnap.data().nome || 'Lava-Jato',
+          endereco: docSnap.data().endereco || '',
+        }));
+        setEmpresas(listaEmpresas);
+
+        const unsubscribes = listaEmpresas.map((emp) => {
+          const q = query(
+            collection(db, 'empresas', emp.id, 'agendamentos'),
+            where('clienteId', '==', user.uid)
+          );
+
+          return onSnapshot(q, (snapshot) => {
+            const agendamentosEmpresa = snapshot.docs.map((docSnap) => ({
+              ...docSnap.data(),
+              id: docSnap.id,
+            })) as Agendamento[];
+
+            setAgendamentoAtivo((prevAtivo) => {
+              const agora = new Date().getTime();
+              const duasHorasEmMs = 2 * 60 * 60 * 1000;
+
+              const ativoLocal = agendamentosEmpresa.find((item) => {
+                if (item.status === 'aguardando_aprovacao' || item.status === 'pendente' || item.status === 'andamento') {
+                  return true;
+                }
+                if (item.status === 'concluido') {
+                  const dataItem = new Date(item.createdAt).getTime();
+                  return (agora - dataItem) < duasHorasEmMs;
+                }
+                return false;
+              });
+              
+              const ultimoConcluido = agendamentosEmpresa.find((item) => item.status === 'concluido');
+              if (ultimoConcluido) {
+                const key = `notificado_${ultimoConcluido.id}`;
+                if (!localStorage.getItem(key)) {
+                  dispararNotificacaoPushCliente(ultimoConcluido.vehicleModel, ultimoConcluido.licensePlate);
+                  localStorage.setItem(key, 'true');
+                }
+              }
+
+              return ativoLocal || prevAtivo;
+            });
+            setLoading(false);
+          });
+        });
+
+        if (listaEmpresas.length === 0) {
+          setLoading(false);
+        }
+
+        return () => {
+          unsubscribes.forEach((unsub) => unsub());
+        };
+      } catch (err) {
+        console.error("Erro ao carregar dados:", err);
+        setLoading(false);
+      }
+    };
+
+    carregarEmpresasEAgendamentos();
+  }, [user]);
+
+  useEffect(() => {
+    if (!empresaSelecionada) return;
+
+    const servicosRef = doc(db, 'empresas', empresaSelecionada.id, 'configuracoes', 'servicos');
+    const unsubServicos = onSnapshot(servicosRef, (docSnap) => {
+      if (docSnap.exists() && docSnap.data().lista) {
+        setServicos(docSnap.data().lista);
+      } else {
+        setServicos(defaultServices as Servico[]);
+      }
+    });
+
+    return () => unsubServicos();
+  }, [empresaSelecionada]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -212,7 +229,6 @@ export default function ClienteHome() {
         createdAt: new Date().toISOString(),
       };
 
-      // Salva apenas no caminho da empresa especificada
       await addDoc(collection(db, 'empresas', empresaSelecionada.id, 'agendamentos'), novoAgendamento);
 
       setFormData({
@@ -242,7 +258,7 @@ export default function ClienteHome() {
 
   const getServiceLabel = (type: string) => {
     const servico = servicos.find((s) => s.id === type);
-    return servico ? servico.name : 'Serviço Selecionado';
+    return servico ? servico.name : (type || 'Serviço Selecionado');
   };
 
   const getInitials = (name: string) => {
@@ -298,6 +314,11 @@ export default function ClienteHome() {
                   {agendamentoAtivo.status === 'andamento' && (
                     <span className="inline-block bg-emerald-500/20 text-emerald-300 text-xs px-2.5 py-1 rounded-full font-semibold border border-emerald-500/30">
                       Em Andamento 🧼
+                    </span>
+                  )}
+                  {agendamentoAtivo.status === 'concluido' && (
+                    <span className="inline-block bg-purple-500/20 text-purple-300 text-xs px-2.5 py-1 rounded-full font-semibold border border-purple-500/30">
+                      Serviço Concluído ✅
                     </span>
                   )}
 
