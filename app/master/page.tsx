@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
 import { onAuthStateChanged } from "firebase/auth";
 import {
   collection,
@@ -35,17 +34,13 @@ interface Empresa {
 const MASTER_UID = process.env.NEXT_PUBLIC_MASTER_UID;
 
 export default function MasterDashboard() {
-  const router = useRouter();
   const [loading, setLoading] = useState(true);
 
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
   const [empresas, setEmpresas] = useState<Empresa[]>([]);
   const [abaAtiva, setAbaAtiva] = useState<"empresas" | "usuarios">("empresas");
 
-  // Estados para edição de empresa
-  const [empresaEditandoId, setEmpresaEditandoId] = useState<string | null>(
-    null,
-  );
+  const [empresaEditandoId, setEmpresaEditandoId] = useState<string | null>(null);
   const [nomeEditado, setNomeEditado] = useState("");
   const [telefoneEditado, setTelefoneEditado] = useState("");
   const [enderecoEditado, setEnderecoEditado] = useState("");
@@ -72,17 +67,16 @@ export default function MasterDashboard() {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-      if (!currentUser || currentUser.uid !== MASTER_UID) {
-        alert("Acesso negado. Apenas o Master pode entrar aqui.");
-        router.push("/login");
-        return;
+      if (!currentUser) return;
+
+      if (currentUser.uid === MASTER_UID) {
+        await carregarDadosMaster();
+        setLoading(false);
       }
-      await carregarDadosMaster();
-      setLoading(false);
     });
 
     return () => unsubscribe();
-  }, [router]);
+  }, []);
 
   const alterarRoleUsuario = async (
     userId: string,
@@ -141,8 +135,8 @@ export default function MasterDashboard() {
       const updates = querySnapshot.docs.map(async (userDoc) => {
         const userRef = doc(db, "users", userDoc.id);
         await updateDoc(userRef, {
-            empresaNome: nomeEditado,
-            empresaEndereco: enderecoEditado,
+          empresaNome: nomeEditado,
+          empresaEndereco: enderecoEditado,
         });
       });
       await Promise.all(updates);
@@ -164,6 +158,23 @@ export default function MasterDashboard() {
       alert("Empresa excluída com sucesso.");
     } catch (error) {
       console.error("Erro ao excluir empresa:", error);
+    }
+  };
+
+  const deletarDev = async (userId: string) => {
+    if (!confirm("Tem certeza que deseja revogar o acesso deste desenvolvedor?"))
+      return;
+    try {
+      const userRef = doc(db, "users", userId);
+      await updateDoc(userRef, { role: "cliente" });
+
+      setUsuarios((prev) =>
+        prev.map((u) => (u.id === userId ? { ...u, role: "cliente" } : u)),
+      );
+      alert("Acesso de desenvolvedor revogado com sucesso.");
+    } catch (error) {
+      console.error("Erro ao revogar acesso de desenvolvedor:", error);
+      alert("Erro ao revogar acesso.");
     }
   };
 
@@ -371,15 +382,29 @@ export default function MasterDashboard() {
                           </p>
                         </div>
                         <div className="flex items-center gap-2">
-                          <span className="text-[11px] text-slate-400">
-                            Revogar acesso:
-                          </span>
                           <button
-                            onClick={() => setAbaAtiva("usuarios")}
-                            className="px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer bg-red-600 text-white shadow-lg shadow-red-600/30"
+                            onClick={() => deletarDev(u.id)}
+                            className="px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer bg-red-600 hover:bg-red-700 text-white shadow-lg shadow-red-600/30"
+                            title="Revogar Acesso"
                           >
-                            X
+                            Revogar Dev
                           </button>
+                          <span className="text-[11px] text-slate-400">
+                            Alterar cargo:
+                          </span>
+                          <select
+                            id={`changeRole-${u.id}`}
+                            value={u.role || "dev"}
+                            onChange={(e) =>
+                              alterarRoleUsuario(u.id, e.target.value, u.empresaId)
+                            }
+                            className="bg-slate-950 border border-slate-700 text-xs rounded-lg px-3 py-1.5 text-white font-medium focus:outline-none focus:border-blue-500 cursor-pointer"
+                          >
+                            <option value="cliente">Cliente</option>
+                            <option value="lavador">Lavador</option>
+                            <option value="adm">Adm</option>
+                            <option value="dev">Dev</option>
+                          </select>
                         </div>
                       </div>
                     ))}
@@ -443,7 +468,6 @@ export default function MasterDashboard() {
                               </option>
                               <option value="adm">Administrador (Adm)</option>
                               <option value="dev">Desenvolvedor (Dev)</option>
-                              <option value="master">Master (Total)</option>
                             </select>
                           </div>
                         </div>
@@ -509,7 +533,6 @@ export default function MasterDashboard() {
                             </option>
                             <option value="adm">Administrador (Adm)</option>
                             <option value="dev">Desenvolvedor (Dev)</option>
-                            <option value="master">Master (Total)</option>
                           </select>
                         </div>
                       </div>
@@ -519,7 +542,7 @@ export default function MasterDashboard() {
               )}
             </div>
           )}
-        <Footer/>
+          <Footer />
         </div>
       </div>
     </ProtectedRoute>

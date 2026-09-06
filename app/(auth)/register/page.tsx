@@ -9,8 +9,7 @@ import {
   onAuthStateChanged,
   User 
 } from 'firebase/auth';
-import { doc, setDoc } from 'firebase/firestore';
-import { auth, db, googleProvider } from '@/app/lib/firebase';
+import { auth, googleProvider } from '@/app/lib/firebase';
 
 interface FirebaseAuthError {
   code?: string;
@@ -103,27 +102,37 @@ export default function RegisterPage() {
 
     try {
       const role = tipoConta === 'empresa' ? 'adm' : 'cliente';
+      const idToken = await userCreated.getIdToken();
 
-      await setDoc(
-        doc(db, 'users', userCreated.uid),
-        {
-          name: nome || userCreated.displayName || '',
-          email: userCreated.email || email,
+      // Envia os dados para a API do Backend
+      const response = await fetch('/api/auth/session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          idToken,
           role,
-          empresaId: tipoConta === 'empresa' ? userCreated.uid : null,
-          createdAt: new Date().toISOString(),
-        },
-        { merge: true }
-      );
+          name: nome || userCreated.displayName || '',
+          empresaId: role === 'adm' ? userCreated.uid : null,
+        }),
+      });
 
-      if (tipoConta === 'empresa') {
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Erro ao criar perfil no servidor.');
+      }
+
+      // Redireciona de acordo com o perfil retornado pela API
+      if (data.role === 'adm') {
         router.push('/adm');
       } else {
         router.push('/cliente');
       }
     } catch (err: unknown) {
       console.error(err);
-      setErro('Erro ao salvar informações do perfil. Tente novamente.');
+      const errorMessage =
+        err instanceof Error ? err.message : 'Erro ao salvar informações do perfil.';
+      setErro(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -180,13 +189,17 @@ export default function RegisterPage() {
 
             <div className="flex items-center my-3">
               <div className="flex-1 border-t border-slate-200"></div>
-              <span className="px-3 text-xs text-slate-400 font-semibold">ou preencha os dados</span>
+              <span className="px-3 text-xs text-slate-400 font-semibold">
+                ou preencha os dados
+              </span>
               <div className="flex-1 border-t border-slate-200"></div>
             </div>
 
             <form onSubmit={handleAuthRegister} className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Nome Completo</label>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Nome Completo
+                </label>
                 <input
                   type="text"
                   required
@@ -198,7 +211,9 @@ export default function RegisterPage() {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">E-mail</label>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  E-mail
+                </label>
                 <input
                   type="email"
                   required
@@ -209,9 +224,10 @@ export default function RegisterPage() {
                 />
               </div>
 
-
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Senha</label>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Senha
+                </label>
                 <input
                   type="password"
                   required

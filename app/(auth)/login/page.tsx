@@ -1,14 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { 
   signInWithEmailAndPassword, 
   signInWithPopup 
 } from "firebase/auth";
-import { doc, getDoc, setDoc } from "firebase/firestore";
-import { auth, db, googleProvider } from "../../lib/firebase";
+import { auth, googleProvider } from "../../lib/firebase";
 
 export default function Login() {
   const router = useRouter();
@@ -17,33 +16,22 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const handleRedirectByRole = async (uid: string) => {
-    try {
-      const userRef = doc(db, "users", uid);
-      const userDoc = await getDoc(userRef);
+  const authenticatedOnBackend = async (idToken: string) => {
+    const response = await fetch("/api/auth/session", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ idToken }),
+    });
 
-      if (userDoc.exists()) {
-        const role = userDoc.data()?.role;
-        if (role === "adm") router.push("/adm");
-        else if (role === "lavador") router.push("/lavador");
-        else router.push("/cliente");
-        return true;
-      } else {
-        await setDoc(
-          userRef,
-          {
-            role: "cliente",
-            createdAt: new Date().toISOString(),
-          },
-          { merge: true }
-        );
-        router.push("/cliente");
-        return true;
-      }
-    } catch (err) {
-      console.error("Erro ao verificar/criar usuário:", err);
-      return false;
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || "Erro ao criar sessão no servidor.");
     }
+
+    if (data.role === "adm") router.push("/adm");
+    else if (data.role === "lavador") router.push("/lavador");
+    else router.push("/cliente");
   };
 
   const handleEmailLogin = async (e: React.FormEvent) => {
@@ -53,7 +41,8 @@ export default function Login() {
 
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      await handleRedirectByRole(userCredential.user.uid);
+      const idToken = await userCredential.user.getIdToken();
+      await authenticatedOnBackend(idToken);
     } catch (err: unknown) {
       console.error(err);
       setError("Email ou senha inválidos.");
@@ -68,7 +57,8 @@ export default function Login() {
 
     try {
       const result = await signInWithPopup(auth, googleProvider);
-      await handleRedirectByRole(result.user.uid);
+      const idToken = await result.user.getIdToken();
+      await authenticatedOnBackend(idToken);
     } catch (err: unknown) {
       console.error(err);
       setError("Erro ao autenticar com o Google.");
@@ -86,7 +76,7 @@ export default function Login() {
             <h5 className="font-bold">
               Entrar no LavaFlow 
               <span className="block text-[12px] text-right font-normal">
-                powered by <a className="underline" href="https://codariadev.vercel.app/">CodariaDev</a>
+                powered by <a className="underline" href="https://codariadev.vercel.app/" target="_blank" rel="noopener noreferrer">CodariaDev</a>
               </span>
             </h5>
           </div>
@@ -166,7 +156,7 @@ export default function Login() {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="inline-block w-full px-6 py-3 mt-6 mb-2 font-bold text-center text-white uppercase align-middle transition-all border-0 rounded-lg cursor-pointer active:opacity-85 hover:scale-102 leading-pro text-xs tracking-tight-soft shadow-soft-md bg-linear-to-tl from-gray-900 to-slate-800 hover:bg-slate-700 disabled:opacity-50"
+                  className="inline-block w-full px-6 py-3 mt-6 mb-2 font-bold text-center text-white uppercase align-middle transition-all border-0 rounded-lg cursor-pointer active:opacity-85 hover:scale-102 leading-pro text-xs tracking-tight-soft shadow-soft-md bg-linear-to-tl bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
                 >
                   {loading ? "Entrando..." : "Entrar"}
                 </button>
@@ -175,7 +165,7 @@ export default function Login() {
               <p className="mt-4 mb-0 leading-normal text-sm text-slate-700 text-center">
                 É empresa <br/> ou <br/> ainda não tem uma conta?<br/>
                 <Link
-                  className="font-bold text-slate-700 underline"
+                  className="font-bold text-blue-600 underline"
                   href="/register"
                 >
                   Registre-se

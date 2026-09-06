@@ -17,45 +17,70 @@ export default function ProtectedRoute({ children, allowedRole }: ProtectedRoute
   const [authorized, setAuthorized] = useState(false);
 
   useEffect(() => {
+    let unsubscribeDoc: (() => void) | undefined;
+
     const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
       if (!user) {
+        if (unsubscribeDoc) unsubscribeDoc();
+        setAuthorized(false);
+        setLoading(false);
         router.push('/login');
         return;
       }
 
       const userDocRef = doc(db, 'users', user.uid);
-      const unsubscribeDoc = onSnapshot(userDocRef, async (docSnap) => {
-        if (!docSnap.exists()) {
-          await setDoc(userDocRef, { role: 'cliente', createdAt: new Date().toISOString() }, { merge: true });
-          setAuthorized(true);
+      unsubscribeDoc = onSnapshot(
+        userDocRef,
+        async (docSnap) => {
+          if (!docSnap.exists()) {
+            await setDoc(
+              userDocRef,
+              { role: 'cliente', createdAt: new Date().toISOString() },
+              { merge: true }
+            );
+            if (allowedRole && allowedRole !== 'cliente') {
+              router.push('/cliente');
+            } else {
+              setAuthorized(true);
+            }
+            setLoading(false);
+            return;
+          }
+
+          const userData = docSnap.data();
+          const role = userData?.role || 'cliente';
+
+          if (allowedRole && role !== allowedRole) {
+            setAuthorized(false);
+            
+            if (role === 'adm') router.push('/adm');
+            else if (role === 'lavador') router.push('/lavador');
+            else if (role === 'dev') router.push('/master');
+            else router.push('/cliente');
+          } else {
+            setAuthorized(true);
+          }
+          
           setLoading(false);
-          return;
+        },
+        (error) => {
+          console.error('Erro ao verificar permissão do usuário:', error);
+          setLoading(false);
+          router.push('/login');
         }
-
-        const userData = docSnap.data();
-        const role = userData?.role || 'cliente';
-
-        if (allowedRole && role !== allowedRole) {
-          if (role === 'adm') router.push('/adm');
-          else if (role === 'lavador') router.push('/lavador');
-          else if (role === 'dev') router.push('/master');
-          else router.push('/cliente');
-        } else {
-          setAuthorized(true);
-        }
-        setLoading(false);
-      });
-
-      return () => unsubscribeDoc();
+      );
     });
 
-    return () => unsubscribeAuth();
+    return () => {
+      unsubscribeAuth();
+      if (unsubscribeDoc) unsubscribeDoc();
+    };
   }, [allowedRole, router]);
 
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-100 flex items-center justify-center text-slate-600 text-sm font-semibold">
-        Carregando...
+        Carregando permissões...
       </div>
     );
   }

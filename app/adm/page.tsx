@@ -83,110 +83,96 @@ export default function AdmDashboard() {
     telefone: "",
   });
 
-  useEffect(() => {
-    let unsubServicos: (() => void) | undefined;
-    let unsubAgendamentos: (() => void) | undefined;
-    let unsubFuncionarios: (() => void) | undefined;
+useEffect(() => {
+  let unsubServicos: (() => void) | undefined;
+  let unsubAgendamentos: (() => void) | undefined;
+  let unsubFuncionarios: (() => void) | undefined;
 
-    const unsubAuth = onAuthStateChanged(auth, async (user) => {
-      if (!user) {
-        router.push("/login");
-        return;
-      }
+  const unsubAuth = onAuthStateChanged(auth, async (user) => {
+    if (!user) {
+      setLoading(false);
+      router.push("/login");
+      return;
+    }
 
-      try {
-        const userDocRef = doc(db, "users", user.uid);
-        const userDoc = await getDoc(userDocRef);
+    try {
+      const userDocRef = doc(db, "users", user.uid);
+      const userDoc = await getDoc(userDocRef);
 
-        if (userDoc.exists()) {
-          const userData = userDoc.data();
-          setUserName(userData.name || user.displayName || "Administrador");
+      if (userDoc.exists()) {
+        const userData = userDoc.data();
+        setUserName(userData.name || user.displayName || "Administrador");
 
-          const empId = userData.empresaId || user.uid;
-          setEmpresaId(empId);
+        const empId = userData.empresaId || user.uid;
+        setEmpresaId(empId);
 
-          if (!userData.empresaNome || !userData.empresaEndereco) {
-            setPrecisaCadastrarEmpresa(true);
-            setLoading(false);
-            return;
-          }
-
-          setEmpresaNome(userData.empresaNome);
-          setEmpresaEndereco(userData.empresaEndereco);
-          setPrecisaCadastrarEmpresa(false);
-
-          const servicosRef = doc(
-            db,
-            "empresas",
-            empId,
-            "configuracoes",
-            "servicos"
-          );
-          unsubServicos = onSnapshot(servicosRef, (docSnap) => {
-            if (docSnap.exists()) {
-              const data = docSnap.data();
-              if (Array.isArray(data.lista)) {
-                setServicos(data.lista);
-              } else {
-                setServicos([]);
-              }
-              if (typeof data.mostrarPrecos === "boolean") {
-                setMostrarPrecos(data.mostrarPrecos);
-              } else {
-                setMostrarPrecos(true);
-              }
-            } else {
-              setServicos([]);
-              setMostrarPrecos(true);
-              setDoc(servicosRef, { lista: [], mostrarPrecos: true });
-            }
-          });
-
-          const agendamentosRef = collection(
-            db,
-            "empresas",
-            empId,
-            "agendamentos"
-          );
-          unsubAgendamentos = onSnapshot(agendamentosRef, (snapshot) => {
-            const listaAtuais = snapshot.docs.map((docSnap) => ({
-              ...docSnap.data(),
-              id: docSnap.id,
-            })) as Agendamento[];
-
-            listaAtuais.sort((a, b) => {
-              const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-              const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-              return dateB - dateA;
-            });
-
-            setAgendamentos(listaAtuais);
-            setLoading(false);
-          });
-
-          const usersRef = collection(db, "empresas", empId, "users");
-          const qFunc = query(usersRef, where("role", "==", "lavador"));
-          unsubFuncionarios = onSnapshot(qFunc, (snapshot) => {
-            const listaFunc = snapshot.docs.map((docSnap) => ({
-              ...docSnap.data(),
-              id: docSnap.id,
-            })) as Funcionario[];
-            setFuncionarios(listaFunc);
-          });
+        if (!userData.empresaNome || !userData.empresaEndereco) {
+          setPrecisaCadastrarEmpresa(true);
+          setLoading(false);
+          return;
         }
-      } catch (err: unknown) {
-        console.error("Erro ao buscar dados da empresa/ADM:", err);
+
+        setEmpresaNome(userData.empresaNome);
+        setEmpresaEndereco(userData.empresaEndereco);
+        setPrecisaCadastrarEmpresa(false);
+
+        // Subscrições aos documentos do Firestore...
+        const servicosRef = doc(db, "empresas", empId, "configuracoes", "servicos");
+        unsubServicos = onSnapshot(servicosRef, (docSnap) => {
+          if (docSnap.exists()) {
+            const data = docSnap.data();
+            setServicos(Array.isArray(data.lista) ? data.lista : []);
+            setMostrarPrecos(typeof data.mostrarPrecos === "boolean" ? data.mostrarPrecos : true);
+          } else {
+            setServicos([]);
+            setMostrarPrecos(true);
+            setDoc(servicosRef, { lista: [], mostrarPrecos: true });
+          }
+        });
+
+        const agendamentosRef = collection(db, "empresas", empId, "agendamentos");
+        unsubAgendamentos = onSnapshot(agendamentosRef, (snapshot) => {
+          const listaAtuais = snapshot.docs.map((docSnap) => ({
+            ...docSnap.data(),
+            id: docSnap.id,
+          })) as Agendamento[];
+
+          listaAtuais.sort((a, b) => {
+            const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+            const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+            return dateB - dateA;
+          });
+
+          setAgendamentos(listaAtuais);
+          setLoading(false);
+        });
+
+        const usersRef = collection(db, "empresas", empId, "users");
+        const qFunc = query(usersRef, where("role", "==", "lavador"));
+        unsubFuncionarios = onSnapshot(qFunc, (snapshot) => {
+          const listaFunc = snapshot.docs.map((docSnap) => ({
+            ...docSnap.data(),
+            id: docSnap.id,
+          })) as Funcionario[];
+          setFuncionarios(listaFunc);
+        });
+      } else {
+        // Se o documento do usuário não existe no Firestore
         setLoading(false);
       }
-    });
+    } catch (err: unknown) {
+      console.error("Erro ao buscar dados da empresa/ADM:", err);
+      setLoading(false);
+    }
+  });
 
-    return () => {
-      unsubAuth();
-      if (unsubServicos) unsubServicos();
-      if (unsubAgendamentos) unsubAgendamentos();
-      if (unsubFuncionarios) unsubFuncionarios();
-    };
-  }, [router]);
+  return () => {
+    unsubAuth();
+    if (unsubServicos) unsubServicos();
+    if (unsubAgendamentos) unsubAgendamentos();
+    if (unsubFuncionarios) unsubFuncionarios();
+  };
+}, [router]);
 
   const handleSalvarDadosEmpresa = async (e: React.FormEvent) => {
     e.preventDefault();
