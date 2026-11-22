@@ -2,10 +2,6 @@
 
 Sistema web de gestão e agendamento para lava-jatos (multiempresa), com painéis por perfil de usuário, login com Google, notificações push e arquivamento diário automático dos serviços.
 
-🔗 **Demo:** [premium-sigma-one.vercel.app](https://premium-sigma-one.vercel.app)
-
----
-
 ## ✨ Funcionalidades
 
 - **Agendamento de serviços** com escolha de serviço, horário, veículo e observações adicionais
